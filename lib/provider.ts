@@ -22,6 +22,7 @@ export interface Provider {
   /** BYOK는 무료 한도를 소모하지 않는다. */
   metered: boolean;
   label: string;
+  reasoningEffort?: string;
 }
 
 const UPSTAGE_BASE = process.env.UPSTAGE_BASE_URL ?? "https://api.upstage.ai/v1";
@@ -65,6 +66,33 @@ export function resolveProvider(): Provider {
 
   const serverUpstage = process.env.UPSTAGE_API_KEY;
   const serverOpenRouter = process.env.OPENROUTER_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    const baseUrl = process.env.OPENAI_BASE_URL?.replace(/\/+$/, "");
+    if (!baseUrl || !/^https?:\/\/[^/\s]+/.test(baseUrl)) {
+      throw new ProviderError("OPENAI_BASE_URL에 제공자의 HTTP(S) API 주소를 설정하세요.", "config");
+    }
+    const model = process.env.OPENAI_MODEL?.trim();
+    if (!model) {
+      throw new ProviderError("OPENAI_MODEL에 제공자가 지원하는 모델 ID를 설정하세요.", "config");
+    }
+    const reasoningEffort = process.env.OPENAI_REASONING_EFFORT?.trim() || undefined;
+    if (reasoningEffort && !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(reasoningEffort)) {
+      throw new ProviderError("OPENAI_REASONING_EFFORT 값이 올바르지 않습니다.", "config");
+    }
+    return {
+      mode: "free",
+      baseUrl,
+      apiKey: openaiKey,
+      model,
+      metered: true,
+      label: `OpenAI 호환 · ${model}${reasoningEffort ? `:${reasoningEffort}` : ""}`,
+      reasoningEffort,
+    };
+  }
+  if (process.env.OPENAI_BASE_URL || process.env.OPENAI_MODEL || process.env.OPENAI_REASONING_EFFORT) {
+    throw new ProviderError("OpenAI 호환 설정에 OPENAI_API_KEY가 없습니다.", "no_key");
+  }
   if (serverOpenRouter) {
     return {
       mode: "free",
@@ -87,7 +115,7 @@ export function resolveProvider(): Provider {
   }
 
   throw new ProviderError(
-    "서버에 무료 티어 키가 설정돼 있지 않습니다. 요청 헤더에 X-Upstage-Api-Key 또는 X-OpenRouter-Api-Key를 넣어 직접 키로 호출하세요.",
+    "서버 키가 없습니다. OPENAI_API_KEY와 OPENAI_BASE_URL을 설정하거나, 요청 헤더에 X-Upstage-Api-Key 또는 X-OpenRouter-Api-Key를 넣으세요.",
     "no_key",
   );
 }
@@ -141,8 +169,9 @@ export async function chat(
         body: JSON.stringify({
           model: provider.model,
           messages,
-          temperature,
-          max_tokens: maxTokens,
+          ...(provider.reasoningEffort
+            ? { reasoning_effort: provider.reasoningEffort, max_completion_tokens: maxTokens }
+            : { temperature, max_tokens: maxTokens }),
         }),
       });
 

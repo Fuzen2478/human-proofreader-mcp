@@ -148,6 +148,8 @@ vercel deploy --prod
 
 | 변수 | 설명 |
 |---|---|
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` | OpenAI 호환 Chat Completions 제공자. 세 값을 모두 지정한다. 서버 키는 OpenAI 호환 → OpenRouter → Upstage 순으로 선택하며, 요청의 기존 BYOK 헤더가 최우선이다. |
+| `OPENAI_REASONING_EFFORT` | 선택 사항. `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. 지정하면 `reasoning_effort`와 `max_completion_tokens`를 보내고 `temperature`는 보내지 않는다. 생략하면 기존 `temperature`·`max_tokens` 방식을 유지한다. 제공자가 지원하는 값만 쓴다. |
 | `OPENROUTER_API_KEY` / `UPSTAGE_API_KEY` | 무료 티어용 서버 키. 둘 중 하나. |
 | `FREE_DAILY_LIMIT` | 하루 무료 콜 수 (기본 100) |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | 한도 집계 저장소. 없으면 인스턴스 메모리로 근사 집계하고, 응답에 그 사실을 표시한다. |
@@ -170,8 +172,44 @@ npm test        # 결정적 계층(가독성·대조·변경률) 회귀 테스�
 npm run typecheck
 ```
 
-LLM을 부르는 부분은 테스트하지 않습니다. 대신 **판정하는 코드 전부**를 테스트합니다 —
-게이트가 조용히 통과하는 것이 이 서버에서 가장 위험한 고장이기 때문입니다.
+`npm test`는 판정 코드와 제공자 설정·요청 계약을 외부 호출 없이 검증합니다.
+실제 서버와 모델을 함께 확인하려면 다음을 실행합니다. API 키는 셸 환경이나
+`.env.local`에만 두고 커밋하지 마세요. `npm run smoke`는 로컬 Next 서버를 시작하고
+MCP `initialize`와 `proofread`(짧은 원고, `light`)를 호출한 뒤 서버를 종료합니다.
+
+```bash
+export OPENAI_API_KEY='<CPA API key>'
+export OPENAI_BASE_URL=https://cpa.fuz3n.com/v1
+export OPENAI_MODEL=claude-opus-5-5-high
+# 제공자가 해당 파라미터를 지원할 때만:
+# export OPENAI_REASONING_EFFORT=max
+npm run smoke
+```
+
+이 예시는 제공자에 실제 등록된 고성능 추론 모델 `claude-opus-5-5-high`를
+사용합니다. `gpt-6-luna`로 실행한 결과가 아닙니다. 모델 ID는 제공자에 전송하는
+그대로 쓰며, Senpi의 `chatgpt-subscription/` 같은 클라이언트 라우팅 접두사는 붙이지 않습니다.
+OpenAI 호환 설정이 불완전하면 다른 서버 키로 조용히 넘어가지 않고 도구 오류로 알려 줍니다.
+Redis는 선택 사항이며 없어도 실행됩니다.
+
+현재 `vercel.json`은 모든 경로를 기존 Upstage 호스트로 프록시합니다.
+위 설정으로 이 코드를 실행하려면 로컬 `npm run dev` 또는 자체 Node 서버에서
+`npm run build && npm start`를 사용하세요. 현재 Vercel 프록시 배포에 환경변수만
+넣어서는 이 코드가 실행되지 않습니다.
+
+### `gpt-6-luna:max` 구독 어댑터가 별도로 필요한 이유
+
+이 워크스테이션의 `gpt-6-luna`는 `chatgpt-subscription` OAuth 제공자에만 있고,
+CPA의 OpenAI 호환 모델 목록에는 없습니다. 구독 API는 비공식이며
+OpenAI 호환 Chat Completions 엔드포인트가 아닙니다. 구독 토큰을
+위 `OPENAI_API_KEY`에 넣어서는 사용할 수 없습니다.
+
+별도 어댑터에는 `~/.omo/agent/auth.json` 같은 승인된 OAuth 토큰 소스,
+구독 백엔드 `https://chatgpt.com/backend-api/codex/responses`,
+Responses 형식의 `instructions`·`input`·`reasoning: { effort: "max" }`와
+`store: false`·`stream: true`, SSE 완료·오류 처리, 필요 시 계정 ID 헤더,
+만료 시 refresh token으로 갱신하고 안전하게 저장하는 처리가 필요합니다.
+이 변경에는 그 어댑터나 토큰 자동 읽기·갱신을 구현하지 않았습니다.
 
 ### 변경률을 어떻게 재는가
 
