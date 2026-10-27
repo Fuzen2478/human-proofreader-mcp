@@ -1,5 +1,5 @@
 import { EXAMPLES } from "./examples";
-import { getBaseUrl, SERVER_NAME } from "@/lib/site";
+import { getBaseUrl, getMovedFrom, SERVER_NAME } from "@/lib/site";
 
 const TOOLS: Array<[string, string, string]> = [
   ["proofread", "원고를 통독하고 교정본을 돌려준다. 이 서버의 본체.", "1~3콜"],
@@ -32,6 +32,8 @@ export default async function Home() {
   // 배포본이 자기 주소를 알고 스니펫에 박아야 "이 링크 붙여 줘"가 한 번에 끝난다.
   const base = await getBaseUrl();
   const endpoint = `${base}/api/mcp`;
+  // 옛 주소로 들어온 사람에게만. 이미 연결해 쓰는 사람이 설정을 바꾸지 않아도 된다는 걸 함께 말한다.
+  const oldOrigin = await getMovedFrom();
 
   return (
     <main
@@ -82,6 +84,26 @@ export default async function Home() {
         <Pill>설치 없이 URL 한 줄</Pill>
         <Pill>더 쓰려면 본인 키로</Pill>
       </div>
+
+      {oldOrigin && (
+        <div
+          role="note"
+          style={{
+            marginTop: 28,
+            padding: "14px 18px",
+            border: `1px solid ${C.accent}`,
+            borderRadius: 8,
+            background: "#fff7ed",
+            fontSize: 15,
+          }}
+        >
+          <strong>새 주소로 옮겼습니다.</strong> 새로 연결하신다면 <code>{endpoint}</code> 를 써 주세요.
+          <br />
+          <span style={{ color: C.muted }}>
+            이미 <code>{oldOrigin}/api/mcp</code> 로 쓰고 계신 분은 그대로 두셔도 계속 동작합니다.
+          </span>
+        </div>
+      )}
 
       {/* ── 연결하기 ─────────────────────────────────────────────── */}
       <Section title="MCP 연결하기">

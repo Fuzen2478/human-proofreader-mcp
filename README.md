@@ -64,11 +64,14 @@ AI 티를 지우는 도구가 아닙니다. **독자가 두 번 읽게 되는 �
 
 Streamable HTTP를 지원하는 클라이언트(Claude Code, Cursor 등)는 URL만 넣으면 됩니다.
 
+> 공개 서버 주소가 `https://human-proofreader-mcp.toy.x.upstage.ai/api/mcp` 로 바뀌었습니다.
+> 예전 주소 `https://human-proofreader-mcp.vercel.app/api/mcp` 로 이미 쓰고 계신 분은 그대로 두셔도 계속 동작합니다.
+
 ```json
 {
   "mcpServers": {
     "human-proofreader": {
-      "url": "https://<your-deployment>.vercel.app/api/mcp"
+      "url": "https://human-proofreader-mcp.toy.x.upstage.ai/api/mcp"
     }
   }
 }
@@ -77,7 +80,7 @@ Streamable HTTP를 지원하는 클라이언트(Claude Code, Cursor 등)는 URL�
 Claude Code는 명령 한 줄로도 됩니다.
 
 ```bash
-claude mcp add --transport http human-proofreader https://<your-deployment>.vercel.app/api/mcp
+claude mcp add --transport http human-proofreader https://human-proofreader-mcp.toy.x.upstage.ai/api/mcp
 ```
 
 stdio만 되는 클라이언트는 `npx -y mcp-remote <url>`을 씁니다.
@@ -110,7 +113,7 @@ stdio만 되는 클라이언트는 `npx -y mcp-remote <url>`을 씁니다.
 {
   "mcpServers": {
     "human-proofreader": {
-      "url": "https://<your-deployment>.vercel.app/api/mcp",
+      "url": "https://human-proofreader-mcp.toy.x.upstage.ai/api/mcp",
       "headers": {
         "X-Upstage-Api-Key": "up_..."
       }

@@ -11,15 +11,49 @@ import { headers } from "next/headers";
 export async function getBaseUrl(): Promise<string> {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
 
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (host) {
-    const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-    return `${proto}://${host}`;
-  }
+  const origin = requestOrigin(await headers());
+  if (origin) return origin;
 
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
+}
+
+/**
+ * 방문자가 실제로 친 주소. 프록시(Vercel rewrites)를 거치면 원래 호스트는
+ * x-forwarded-host 에 있으므로 그쪽을 먼저 본다.
+ */
+export function requestOrigin(h: Headers): string | null {
+  const host = h.get("x-forwarded-host")?.split(",")[0]?.trim() || h.get("host");
+  if (!host) return null;
+  const proto =
+    h.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+    (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+/**
+ * 방문자가 정식 주소가 아닌 곳(옛 주소)으로 들어왔다면 그 주소를, 아니면 null.
+ * 주소를 옮긴 뒤 옛 주소로 온 사람에게만 "옮겼다" 고 알리는 데 쓴다.
+ */
+export function movedFrom(visited: string | null, canonical: string): string | null {
+  if (!visited) return null;
+  let v: URL;
+  let c: URL;
+  try {
+    v = new URL(visited);
+    c = new URL(canonical);
+  } catch {
+    return null;
+  }
+  if (v.hostname === "localhost" || v.hostname === "127.0.0.1") return null;
+  if (v.host.toLowerCase() === c.host.toLowerCase()) return null;
+  return `${v.protocol}//${v.host}`;
+}
+
+/** 지금 요청이 정식 주소(PUBLIC_URL)가 아닌 곳으로 들어왔다면 그 주소. */
+export async function getMovedFrom(): Promise<string | null> {
+  if (!process.env.PUBLIC_URL) return null;
+  return movedFrom(requestOrigin(await headers()), process.env.PUBLIC_URL);
 }
 
 export const SERVER_NAME = "human-proofreader";
